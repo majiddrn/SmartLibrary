@@ -1,7 +1,16 @@
 #include "Handler.h"
 
 extern UART_HandleTypeDef huart2;
+
 extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim3;
+
+RGBTimer rgbLeds[] = {
+		{1, &htim2},
+		{2, &htim3}
+};
+
+uint8_t rgbLedsCount = 2;
 
 int parseMessage(char* message, LedMessage* ledMessage) {
 	// Check if the message starts with "LED#"
@@ -36,6 +45,23 @@ int doLEDFunc(LedMessage ledMessage) {
 	else if (strstr(ledMessage.color, "RED"))
 		color = LED_RED;
 
+	else
+		return -1;
+
+	TIM_HandleTypeDef* htim_;
+
+	int found = 0;
+
+	for (uint8_t i = 0; i < rgbLedsCount; i++) {
+		if (rgbLeds[i].ledNumber == ledMessage.ledNumber) {
+			found = 1;
+			htim_ = rgbLeds[i].htim_;
+		}
+	}
+
+	if (found == 0)
+		return -1;
+
 	/*
 	 * TIM_CHANNEL_1 represents Red
 	 * TIM_CHANNEL_2 represents Green
@@ -44,21 +70,21 @@ int doLEDFunc(LedMessage ledMessage) {
 
 	switch (color) {
 		case LED_GREEN:
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 0);
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 500);
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 0);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 25);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
 			break;
 
 		case LED_YELLOW:
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 500);
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 500);
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 12);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 12);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
 			break;
 
 		case LED_RED:
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, 500);
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_2, 0);
-			__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 25);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 0);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
 			break;
 		default:
 			break;

@@ -5,9 +5,14 @@
 #include <string.h>
 
 typedef struct {
-    int ledNumber;
+    uint8_t ledNumber;
     char color[10];
 } LedMessage;
+
+typedef struct {
+	uint8_t ledNumber;
+	TIM_HandleTypeDef* htim_;
+} RGBTimer;
 
 enum ACK_TYPE{
 	ACK_OK,

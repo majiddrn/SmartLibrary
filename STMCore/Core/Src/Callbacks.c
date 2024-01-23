@@ -21,6 +21,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 	            osSemaphoreRelease(diffRxDataHandle);
 	        } else
 	        	data_c_idx++;
+
 	        HAL_UART_Receive_IT(&huart2, &data_c, 1);
 	}
 }

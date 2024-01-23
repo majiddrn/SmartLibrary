@@ -1,4 +1,5 @@
 "./Core/Src/Callbacks.o"
+"./Core/Src/Handler.o"
 "./Core/Src/freertos.o"
 "./Core/Src/main.o"
 "./Core/Src/stm32f3xx_hal_msp.o"

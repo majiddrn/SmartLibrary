@@ -1,0 +1,6 @@
+#ifndef SENSORS_MODULES_COMMON_H
+#define SENSORS_MODULES_COMMON_H
+
+#include "SSD1306Wire.h"
+
+#endif

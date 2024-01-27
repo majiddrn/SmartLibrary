@@ -2,114 +2,152 @@
 
 extern UART_HandleTypeDef huart2;
 
-extern TIM_HandleTypeDef htim2;
-extern TIM_HandleTypeDef htim3;
+MessageType getMessageType(const char* message) {
+    if (strncmp(message, "LED#", 4) == 0)
+        return MESSAGE_TYPE_LED;
+    else if (strncmp(message, "PIR#", 4) == 0)
+        return MESSAGE_TYPE_PIR;
+    else if (strncmp(message, "AVOID#", 6) == 0 || strncmp(message, "AVOIDE#", 7) == 0)
+        return MESSAGE_TYPE_AVOID;
+    else
+        return MESSAGE_TYPE_INVALID;
+}
 
-RGBTimer rgbLeds[] = {
-		{1, &htim2},
-		{2, &htim3}
-};
-
-uint8_t rgbLedsCount = 2;
-
-int parseMessage(char* message, LedMessage* ledMessage) {
-	// Check if the message starts with "LED#"
+int parseLedMessage(char* message, Message* ledMessage) {
 	if (strncmp(message, "LED#", 4) != 0)
 		return -1; // Invalid message
+
+	ledMessage->type = MESSAGE_TYPE_LED;
 
 	// Extract the LED number
 	char* token = strtok(message + 4, ":");
 	if (token == NULL)
 		return -1; // Invalid message
 
-	ledMessage->ledNumber = atoi(token);
+	ledMessage->mNumber = atoi(token);
 
 	// Extract the color
 	token = strtok(NULL, "#");
 	if (token == NULL)
 		return -1; // Invalid message
 
-	strcpy(ledMessage->color, token);
+	strcpy(ledMessage->message, token);
 
 	return 0; // Valid message
 }
 
-int doLEDFunc(LedMessage ledMessage) {
-	enum LED_COLOR color;
-	if (strstr(ledMessage.color, "GREEN"))
-		color = LED_GREEN;
+int parsePirMessage(char* message, Message* pirMessage) {
+	if (strncmp(message, "PIR#", 4) != 0)
+		return -1; // Invalid message
 
-	else if (strstr(ledMessage.color, "YELLOW"))
-		color = LED_YELLOW;
+	pirMessage->type = MESSAGE_TYPE_PIR;
 
-	else if (strstr(ledMessage.color, "RED"))
-		color = LED_RED;
+	// Extract the PIR number
+	char* token = strtok(message + 4, ":");
+	if (token == NULL)
+		return -1; // Invalid message
 
-	else
-		return -1;
+	pirMessage->mNumber = atoi(token);
 
-	TIM_HandleTypeDef* htim_;
+	// Extract the action
+	token = strtok(NULL, "#");
+	if (token == NULL)
+		return -1; // Invalid message
 
-	int found = 0;
+	strcpy(pirMessage->message, token);
 
-	for (uint8_t i = 0; i < rgbLedsCount; i++) {
-		if (rgbLeds[i].ledNumber == ledMessage.ledNumber) {
-			found = 1;
-			htim_ = rgbLeds[i].htim_;
-		}
-	}
-
-	if (found == 0)
-		return -1;
-
-	/*
-	 * TIM_CHANNEL_1 represents Red
-	 * TIM_CHANNEL_2 represents Green
-	 * TIM_CHANNEL_2 represents Blue
-	 * */
-
-	switch (color) {
-		case LED_GREEN:
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 0);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 25);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
-			break;
-
-		case LED_YELLOW:
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 12);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 12);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
-			break;
-
-		case LED_RED:
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 25);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 0);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
-			break;
-		default:
-			break;
-	}
-
-	return 1;
+	return 0; // Valid message
 }
 
+int parseAvoidMessage(char* message, Message* avoidMessage) {
+	if ((strncmp(message, "AVOID#", 6) != 0) && (strncmp(message, "AVOIDE#", 7) != 0))
+		return -1; // Invalid message
+
+	avoidMessage->type = MESSAGE_TYPE_AVOID;
+
+	// Extract the AVOID number
+	char* token = strtok(message + 6, ":");
+	if (token == NULL)
+		return -1; // Invalid message
+
+	avoidMessage->mNumber = atoi(token);
+
+	// Extract the action
+	token = strtok(NULL, "#");
+	if (token == NULL)
+		return -1; // Invalid message
+
+	strcpy(avoidMessage->message, token);
+
+	return 0; // Valid message
+}
+
+int parseMessage(char* message, Message* messageStruct) {
+    MessageType messageType = getMessageType(message);
+    switch (messageType) {
+        case MESSAGE_TYPE_LED:
+            return parseLedMessage(message, messageStruct);
+        case MESSAGE_TYPE_PIR:
+            return parsePirMessage(message, messageStruct);
+        case MESSAGE_TYPE_AVOID:
+            return parseAvoidMessage(message, messageStruct);
+        default:
+            return -1; // Invalid message
+    }
+}
+
+//int parseMessage(char* message, LedMessage* ledMessage) {
+//	// Check if the message starts with "LED#"
+//	if (strncmp(message, "LED#", 4) != 0)
+//		return -1; // Invalid message
+//
+//	// Extract the LED number
+//	char* token = strtok(message + 4, ":");
+//	if (token == NULL)
+//		return -1; // Invalid message
+//
+//	ledMessage->ledNumber = atoi(token);
+//
+//	// Extract the color
+//	token = strtok(NULL, "#");
+//	if (token == NULL)
+//		return -1; // Invalid message
+//
+//	strcpy(ledMessage->color, token);
+//
+//	return 0; // Valid message
+//}
+
 void addToHandler(char data[]) {
-	LedMessage ledMessage;
-	int parse = parseMessage(data, &ledMessage);
+	Message message;
+	int parse = parseMessage(data, &message);
 
 	if (parse == -1) {
 		sendACK(ACK_INVALID);
 		return;
 	}
 
-	int funcStat = doLEDFunc(ledMessage);
+	int funcStat;
+
+	switch (message.type) {
+		case MESSAGE_TYPE_LED:
+			funcStat = doLEDFunc(message);
+			break;
+		case MESSAGE_TYPE_AVOID:
+			break;
+		case MESSAGE_TYPE_PIR:
+			break;
+		default:
+			break;
+	}
 
 	if (funcStat == -1) {
 		sendACK(ACK_ERR);
 		return;
 	}
 
-	sendACK(ACK_OK);
+	if (message.type == MESSAGE_TYPE_LED)
+		sendACK(ACK_OK);
 }
 
 
@@ -122,7 +160,8 @@ void sendACK(enum ACK_TYPE ack) {
 		case ACK_INVALID:
 			len = sprintf(tmp, "INVALID\r");
 			status = HAL_UART_Transmit(&huart2, tmp, len, 250);
-
+//			else
+//				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, 1);
 			break;
 		case ACK_OK:
 			len = sprintf(tmp, "OK\r");

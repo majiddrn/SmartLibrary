@@ -38,10 +38,13 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-
+uint32_t rawAVOID[2];
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
 I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
@@ -50,7 +53,6 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart2;
-DMA_HandleTypeDef hdma_usart2_tx;
 
 PCD_HandleTypeDef hpcd_USB_FS;
 
@@ -65,7 +67,14 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t uartRxDiffHandle;
 const osThreadAttr_t uartRxDiff_attributes = {
   .name = "uartRxDiff",
-  .stack_size = 500 * 4,
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for AvoidPIRHandler */
+osThreadId_t AvoidPIRHandlerHandle;
+const osThreadAttr_t AvoidPIRHandler_attributes = {
+  .name = "AvoidPIRHandler",
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for diffBufferRead */
@@ -97,8 +106,10 @@ static void MX_USB_PCD_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
+static void MX_ADC1_Init(void);
 void StartDefaultTask(void *argument);
 void uartRxDiff_f(void *argument);
+void AvoidPIRHandler_f(void *argument);
 
 /* USER CODE BEGIN PFP */
 
@@ -109,6 +120,32 @@ void uartRxDiff_f(void *argument);
 char data[150];
 char data_c;
 uint8_t data_c_idx = 0;
+
+void setADC1Configs(uint8_t channel) {
+	ADC_ChannelConfTypeDef sConfig;
+
+	switch (channel) {
+		case 2:
+			sConfig.Channel = ADC_CHANNEL_2; // ADC Channel
+			sConfig.Rank = 1; //Rank (1-16) Rank: The rank in the regular group sequencer.
+			sConfig.SamplingTime = ADC_SAMPLETIME_601CYCLES_5; //ADC Sampling Times
+			sConfig.Offset = 0; // Reserved
+			break;
+		case 3:
+			sConfig.Channel = ADC_CHANNEL_3;
+			sConfig.Rank = 1;
+			sConfig.SamplingTime = ADC_SAMPLETIME_601CYCLES_5;
+			sConfig.Offset = 0;
+			break;
+	}
+
+	if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) == HAL_OK) {
+		HAL_ADC_Start(&hadc1);
+		HAL_ADC_PollForConversion(&hadc1, 1000);
+	}
+
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -146,8 +183,18 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
   HAL_UART_Receive_IT(&huart2, &data_c, 1);
+
+//  HAL_ADC_Start(&hadc1);
+//  HAL_ADC_Start_DMA(&hadc1, rawAVOID, 2);
+//  setADC1Configs(2);
+//  HAL_ADC_Start(&hadc1);
+//
+//  setADC1Configs(3);
+//  HAL_ADC_Start(&hadc1);
+//  setADC1Configs();
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
@@ -202,6 +249,9 @@ int main(void)
   /* creation of uartRxDiff */
   uartRxDiffHandle = osThreadNew(uartRxDiff_f, NULL, &uartRxDiff_attributes);
 
+  /* creation of AvoidPIRHandler */
+  AvoidPIRHandlerHandle = osThreadNew(AvoidPIRHandler_f, NULL, &AvoidPIRHandler_attributes);
+
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -245,7 +295,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL6;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -260,19 +310,86 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_USART2
-                              |RCC_PERIPHCLK_I2C1;
+                              |RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_ADC12;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
+  PeriphClkInit.Adc12ClockSelection = RCC_ADC12PLLCLK_DIV1;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
-  PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL;
+  PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.SamplingTime = ADC_SAMPLETIME_601CYCLES_5;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -553,9 +670,9 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Channel7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+  /* DMA1_Channel1_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
 
 }
 
@@ -574,9 +691,10 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOF_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
+  HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|GPIO_PIN_10
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
 
@@ -588,10 +706,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : CS_I2C_SPI_Pin LD4_Pin LD3_Pin LD5_Pin
+  /*Configure GPIO pins : CS_I2C_SPI_Pin LD4_Pin LD3_Pin PE10
                            LD7_Pin LD9_Pin LD10_Pin LD8_Pin
                            LD6_Pin */
-  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|LD5_Pin
+  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|GPIO_PIN_10
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
@@ -672,6 +790,44 @@ void uartRxDiff_f(void *argument)
     osDelay(1);
   }
   /* USER CODE END uartRxDiff_f */
+}
+
+/* USER CODE BEGIN Header_AvoidPIRHandler_f */
+/**
+* @brief Function implementing the AvoidPIRHandler thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_AvoidPIRHandler_f */
+void AvoidPIRHandler_f(void *argument)
+{
+  /* USER CODE BEGIN AvoidPIRHandler_f */
+  /* Infinite loop */
+
+
+  for(;;)
+  {
+//	  HAL_ADC_Start_DMA(&hadc1, rawAVOID, 2);
+//	  osDelay(pdMS_TO_TICKS(50));
+//	  HAL_ADC_Stop_DMA(&hadc1);
+//	  HAL_ADC_
+
+	  setADC1Configs(2);
+	  uint32_t c2Val = HAL_ADC_GetValue(&hadc1);
+
+	  osDelay(pdMS_TO_TICKS(50));
+
+	  setADC1Configs(3);
+	  uint32_t c3Val = HAL_ADC_GetValue(&hadc1);
+
+	  char tmp[50];
+	  sprintf(tmp, "ch1:%d,ch2:%d\n", c2Val, c3Val);
+
+	  HAL_UART_Transmit(&huart2, tmp, strlen(tmp), 250);
+
+	  osDelay(pdMS_TO_TICKS(250));
+  }
+  /* USER CODE END AvoidPIRHandler_f */
 }
 
 /**

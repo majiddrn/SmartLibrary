@@ -18,6 +18,7 @@ bool TableHandler::sitOn(uint8_t num, String sNum) {
 
     seats[num-1].status = SEAT_IN_USE_REST;
     seats[num-1].studentNum = sNum;
+    seats[num-1].number = num;
 
     return true;
 }

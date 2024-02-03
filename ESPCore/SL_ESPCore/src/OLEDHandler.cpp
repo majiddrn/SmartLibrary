@@ -89,7 +89,20 @@ uint8_t OLEDHandler::increaseNumber() {
 }
 
 uint8_t OLEDHandler::getNumber() {
-    return number + 1;
+    return number;
+}
+
+void OLEDHandler::drawString(String str) {
+    display.clear();
+
+    display.setFont(ArialMT_Plain_16);
+    display.drawString(2, 20, str);
+    display.display();
+
+    vTaskDelay(5000);
+
+    drawScreen(number, true);
+
 }
 
 OLEDHandler::~OLEDHandler()

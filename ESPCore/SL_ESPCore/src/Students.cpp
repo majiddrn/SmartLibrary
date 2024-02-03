@@ -1,6 +1,8 @@
 #include "Students.h"
 
 uint16_t Students::snums_idx = 0;
+Student Students::snums[100] = {};
+
 
 Students::Students(/* args */)
 {
@@ -16,7 +18,7 @@ Student Students::isStudentValid(String snum) {
     uint16_t i;
 
     for (i = 0; i < snums_idx; i++)
-        if (snums[i].snum == snum){
+        if (Students::snums[i].snum == snum){
             found = true;
             break;
         }
@@ -28,5 +30,9 @@ Student Students::isStudentValid(String snum) {
 }
 
 void Students::addStudent(Student s) {
-    snums[snums_idx++] = s;
+    Students::snums[snums_idx++] = s;
+}
+
+void Students::addSittedStudent(Student s) {
+    sittedStudents.push_back(s);
 }

@@ -12,6 +12,7 @@ typedef enum SeatStatus {
 typedef struct Seat {
     String studentNum;
     SeatStatus status;
+    uint8_t number;
 };
 
 class TableHandler

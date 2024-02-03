@@ -1,10 +1,18 @@
 #include <Arduino.h>
 #include <SPI.h>
 
-#include "Handlers/RTOSHandler.h"
-#include "Handlers/ParserSerial2Handler.h"
+// #include "Handlers/RTOSHandler.h"
+// #include "Handlers/ParserSerial2Handler.h"
 
-ParserSerial2Handler psh;
+// ParserSerial2Handler psh;
+
+#include <SPI.h>
+#include <MFRC522.h>
+
+// #define RST_PIN         15           // Configurable, see typical pin layout above
+// #define SS_PIN          5          // Configurable, see typical pin layout above
+
+// MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 String data;
 
@@ -12,7 +20,76 @@ void setup() {
    Serial.begin(115200);
    Serial2.begin(38400);
 
-   
+//    SPI.begin();                                                  // Init SPI bus
+//   mfrc522.PCD_Init();      
+
+   // MFRC522::MIFARE_Key key;
+
+   //  for (byte i = 0; i < 6; i++) key.keyByte[i] = 0xFF;
+
+   //  byte block;
+   //  byte len;
+   //  MFRC522::StatusCode status;
+
+   //  while (true)
+   //  {
+
+   //       mfrc522.PCD_StopCrypto1();
+   //       vTaskDelay(50 / portTICK_PERIOD_MS);
+
+
+   //       if ( ! mfrc522.PICC_IsNewCardPresent()) {
+   //          Serial.print(F("Authentication failed: "));
+   //          Serial.println(mfrc522.GetStatusCodeName(status));
+
+   //          vTaskDelay(1000 / portTICK_PERIOD_MS);
+   //          continue;
+   //       }
+
+   //      if (!mfrc522.PICC_ReadCardSerial()) {
+   //          Serial.print(F("Reading failed: "));
+   //          Serial.println(mfrc522.GetStatusCodeName(status));
+
+   //          vTaskDelay(1000 / portTICK_PERIOD_MS);
+   //          continue;
+   //      }
+
+   //      Serial.println(F("**Card Detected:**"));
+
+   //      byte buffer[32];
+
+   //      block = 16;
+   //      len = 32;
+
+   //      status = mfrc522.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, block, &key, &(mfrc522.uid));
+   //      if (status != MFRC522::STATUS_OK) {
+   //          vTaskDelay(250 / portTICK_PERIOD_MS);
+   //          continue;
+   //      }
+
+   //      status = mfrc522.MIFARE_Read(block, buffer, &len);
+   //      if (status != MFRC522::STATUS_OK) {
+   //          vTaskDelay(250 / portTICK_PERIOD_MS);
+   //          continue;
+   //      }
+
+   //      char asciiBuffer[11];
+
+   //      for (uint8_t i = 0; i < 10; i++) {
+   //          asciiBuffer[i] = (char) buffer[i];
+   //      }
+
+   //      Serial.println(asciiBuffer);
+        
+
+   //      vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+   //       mfrc522.PICC_HaltA();
+   //       mfrc522.PCD_StopCrypto1();
+
+   //       // vTaskDelay(1000 / portTICK_PERIOD_MS);
+
+   //  }
 
    init();
 

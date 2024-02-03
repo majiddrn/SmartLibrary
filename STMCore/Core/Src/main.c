@@ -39,11 +39,16 @@
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
 uint32_t rawAVOID[2];
+uint32_t rawAVOIDWindow[2][10];
+
+uint8_t rawAVOIDWindow_idx = 0;
+uint8_t maxSeats = 2;
+
+uint32_t pirTime[2];
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
 
 I2C_HandleTypeDef hi2c1;
 
@@ -51,6 +56,8 @@ SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim8;
 
 UART_HandleTypeDef huart2;
 
@@ -67,7 +74,7 @@ const osThreadAttr_t defaultTask_attributes = {
 osThreadId_t uartRxDiffHandle;
 const osThreadAttr_t uartRxDiff_attributes = {
   .name = "uartRxDiff",
-  .stack_size = 256 * 4,
+  .stack_size = 200 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for AvoidPIRHandler */
@@ -81,6 +88,26 @@ const osThreadAttr_t AvoidPIRHandler_attributes = {
 osMutexId_t diffBufferReadHandle;
 const osMutexAttr_t diffBufferRead_attributes = {
   .name = "diffBufferRead"
+};
+/* Definitions for AvoidDistance1 */
+osMutexId_t AvoidDistance1Handle;
+const osMutexAttr_t AvoidDistance1_attributes = {
+  .name = "AvoidDistance1"
+};
+/* Definitions for AvoidDistance2 */
+osMutexId_t AvoidDistance2Handle;
+const osMutexAttr_t AvoidDistance2_attributes = {
+  .name = "AvoidDistance2"
+};
+/* Definitions for pirTime1 */
+osMutexId_t pirTime1Handle;
+const osMutexAttr_t pirTime1_attributes = {
+  .name = "pirTime1"
+};
+/* Definitions for pirTime2 */
+osMutexId_t pirTime2Handle;
+const osMutexAttr_t pirTime2_attributes = {
+  .name = "pirTime2"
 };
 /* Definitions for diffRxData */
 osSemaphoreId_t diffRxDataHandle;
@@ -99,7 +126,6 @@ const osSemaphoreAttr_t dataBufferSemaphore_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
@@ -107,6 +133,8 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_TIM8_Init(void);
 void StartDefaultTask(void *argument);
 void uartRxDiff_f(void *argument);
 void AvoidPIRHandler_f(void *argument);
@@ -146,6 +174,24 @@ void setADC1Configs(uint8_t channel) {
 
 }
 
+int compare(const void* a, const void* b) {
+    int A = *((int*)a);
+    int B = *((int*)b);
+    return A - B;
+}
+
+double getMedian(int arr[], int n) {
+    // Sorting the array
+    qsort(arr, n, sizeof(int), compare);
+
+    // If size of the array is even
+    if (n % 2 != 0)
+        return (double)arr[n/2];
+
+    // If size of the array is odd
+    return (double)(arr[(n-1)/2] + arr[n/2])/2.0;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -176,7 +222,6 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_I2C1_Init();
   MX_SPI1_Init();
   MX_USB_PCD_Init();
@@ -184,6 +229,8 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
+  MX_TIM4_Init();
+  MX_TIM8_Init();
   /* USER CODE BEGIN 2 */
   HAL_UART_Receive_IT(&huart2, &data_c, 1);
 
@@ -195,6 +242,10 @@ int main(void)
 //  setADC1Configs(3);
 //  HAL_ADC_Start(&hadc1);
 //  setADC1Configs();
+  HAL_TIM_Base_Start(&htim4);
+  HAL_TIM_Base_Start(&htim8);
+
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, 0);
 
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1);
   HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_2);
@@ -218,6 +269,18 @@ int main(void)
   /* Create the mutex(es) */
   /* creation of diffBufferRead */
   diffBufferReadHandle = osMutexNew(&diffBufferRead_attributes);
+
+  /* creation of AvoidDistance1 */
+  AvoidDistance1Handle = osMutexNew(&AvoidDistance1_attributes);
+
+  /* creation of AvoidDistance2 */
+  AvoidDistance2Handle = osMutexNew(&AvoidDistance2_attributes);
+
+  /* creation of pirTime1 */
+  pirTime1Handle = osMutexNew(&pirTime1_attributes);
+
+  /* creation of pirTime2 */
+  pirTime2Handle = osMutexNew(&pirTime2_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -315,11 +378,13 @@ void SystemClock_Config(void)
     Error_Handler();
   }
   PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_USART2
-                              |RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_ADC12;
+                              |RCC_PERIPHCLK_I2C1|RCC_PERIPHCLK_TIM8
+                              |RCC_PERIPHCLK_ADC12;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   PeriphClkInit.Adc12ClockSelection = RCC_ADC12PLLCLK_DIV1;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
   PeriphClkInit.USBClockSelection = RCC_USBCLKSOURCE_PLL_DIV1_5;
+  PeriphClkInit.Tim8ClockSelection = RCC_TIM8CLK_HCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -595,6 +660,98 @@ static void MX_TIM3_Init(void)
 }
 
 /**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 71;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 65535;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
+
+}
+
+/**
+  * @brief TIM8 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM8_Init(void)
+{
+
+  /* USER CODE BEGIN TIM8_Init 0 */
+
+  /* USER CODE END TIM8_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM8_Init 1 */
+
+  /* USER CODE END TIM8_Init 1 */
+  htim8.Instance = TIM8;
+  htim8.Init.Prescaler = 7199;
+  htim8.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim8.Init.Period = 9999;
+  htim8.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim8.Init.RepetitionCounter = 0;
+  htim8.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim8, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterOutputTrigger2 = TIM_TRGO2_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim8, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM8_Init 2 */
+
+  /* USER CODE END TIM8_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -661,22 +818,6 @@ static void MX_USB_PCD_Init(void)
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel1_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel1_IRQn, 5, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel1_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -697,6 +838,12 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|LD4_Pin|LD3_Pin|GPIO_PIN_10
                           |LD7_Pin|LD9_Pin|LD10_Pin|LD8_Pin
                           |LD6_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(AVOID_2_Trigger_GPIO_Port, AVOID_2_Trigger_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(AVOID_1_Trigger_GPIO_Port, AVOID_1_Trigger_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pins : DRDY_Pin MEMS_INT3_Pin MEMS_INT4_Pin MEMS_INT1_Pin
                            MEMS_INT2_Pin */
@@ -722,6 +869,51 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(B1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : AVOID_2_Trigger_Pin */
+  GPIO_InitStruct.Pin = AVOID_2_Trigger_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(AVOID_2_Trigger_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : AVOID_2_Echo_Pin */
+  GPIO_InitStruct.Pin = AVOID_2_Echo_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(AVOID_2_Echo_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PIR_MOVE_2_Pin */
+  GPIO_InitStruct.Pin = PIR_MOVE_2_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(PIR_MOVE_2_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PIR_MOVE_1_Pin */
+  GPIO_InitStruct.Pin = PIR_MOVE_1_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
+  HAL_GPIO_Init(PIR_MOVE_1_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : AVOID_1_Echo_Pin */
+  GPIO_InitStruct.Pin = AVOID_1_Echo_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(AVOID_1_Echo_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : AVOID_1_Trigger_Pin */
+  GPIO_InitStruct.Pin = AVOID_1_Trigger_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(AVOID_1_Trigger_GPIO_Port, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 5, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
 
 }
 
@@ -807,25 +999,67 @@ void AvoidPIRHandler_f(void *argument)
 
   for(;;)
   {
-//	  HAL_ADC_Start_DMA(&hadc1, rawAVOID, 2);
-//	  osDelay(pdMS_TO_TICKS(50));
-//	  HAL_ADC_Stop_DMA(&hadc1);
-//	  HAL_ADC_
+//	  uint32_t c2Val, c3Val;
+//
+//	  setADC1Configs(2);
+//	  c2Val = HAL_ADC_GetValue(&hadc1);
+//
+	  /// Getting tof from ultrasonic
 
-	  setADC1Configs(2);
-	  uint32_t c2Val = HAL_ADC_GetValue(&hadc1);
+	  char tmp[80];
+
+
+
+	  //// End of getting tof from ultrasonic
+
+	  HAL_GPIO_TogglePin(GPIOE, GPIO_PIN_8);
+
+	  rawAVOIDWindow[0][rawAVOIDWindow_idx] = getAvoidDistance(1);
+	  rawAVOIDWindow[1][rawAVOIDWindow_idx] = getAvoidDistance(2);
+
+	  rawAVOIDWindow_idx++;
+
+	  if (rawAVOIDWindow_idx == 10) {
+		  osMutexAcquire(AvoidDistance1Handle, portMAX_DELAY);
+		  rawAVOID[0] = getMedian(rawAVOIDWindow[0], 10);
+		  osMutexRelease(AvoidDistance1Handle);
+		  osMutexAcquire(AvoidDistance2Handle, portMAX_DELAY);
+		  rawAVOID[1] = getMedian(rawAVOIDWindow[1], 10);
+		  osMutexRelease(AvoidDistance2Handle);
+
+		  rawAVOIDWindow_idx = 0;
+//		  uint8_t s = sprintf(tmp, "1: %d, 2: %d\n", rawAVOID[0], rawAVOID[1]);
+//		  HAL_UART_Transmit(&huart2, tmp, s, 250);
+	  }
+
+//	  if
+//	  rawAVOID[0] = getAvoidDistance(1);
+//	  rawAVOID[1] = getAvoidDistance(2);
+//
+//	  uint8_t s = sprintf(tmp, "%d\n", rawAVOID[0]);
+
+//
+
+
+//	  osDelay(pdMS_TO_TICKS(50));
+//
+//	  setADC1Configs(3);
+//	  c3Val = HAL_ADC_GetValue(&hadc1);
+//
+//	  osMutexAcquire(AvoidDistance1Handle, portMAX_DELAY);
+//	  rawAVOID[0] = c2Val;
+//	  osMutexRelease(AvoidDistance1Handle);
+//
+//	  osMutexAcquire(AvoidDistance2Handle, portMAX_DELAY);
+//	  rawAVOID[1] = c3Val;
+//	  osMutexRelease(AvoidDistance2Handle);
+
+//	  char tmp[50];
+//	  sprintf(tmp, "ch1:%d,ch2:%d\n", c2Val, c3Val);
+
+//	  HAL_UART_Transmit(&huart2, tmp, strlen(tmp), 250);
 
 	  osDelay(pdMS_TO_TICKS(50));
-
-	  setADC1Configs(3);
-	  uint32_t c3Val = HAL_ADC_GetValue(&hadc1);
-
-	  char tmp[50];
-	  sprintf(tmp, "ch1:%d,ch2:%d\n", c2Val, c3Val);
-
-	  HAL_UART_Transmit(&huart2, tmp, strlen(tmp), 250);
-
-	  osDelay(pdMS_TO_TICKS(250));
   }
   /* USER CODE END AvoidPIRHandler_f */
 }

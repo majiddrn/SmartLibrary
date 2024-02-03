@@ -44,18 +44,18 @@ int doLEDFunc(Message ledMessage) {
 	switch (color) {
 		case LED_GREEN:
 			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 0);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 25);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 100);
 			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
 			break;
 
 		case LED_YELLOW:
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 12);
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 12);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 50);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 50);
 			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
 			break;
 
 		case LED_RED:
-			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 25);
+			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_1, 100);
 			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_2, 0);
 			__HAL_TIM_SET_COMPARE(htim_, TIM_CHANNEL_3, 0);
 			break;

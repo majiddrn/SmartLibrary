@@ -67,6 +67,7 @@ void Error_Handler(void);
 #define MEMS_INT3_GPIO_Port GPIOE
 #define MEMS_INT4_Pin GPIO_PIN_5
 #define MEMS_INT4_GPIO_Port GPIOE
+#define MEMS_INT4_EXTI_IRQn EXTI9_5_IRQn
 #define OSC32_IN_Pin GPIO_PIN_14
 #define OSC32_IN_GPIO_Port GPIOC
 #define OSC32_OUT_Pin GPIO_PIN_15
@@ -97,6 +98,16 @@ void Error_Handler(void);
 #define LD8_GPIO_Port GPIOE
 #define LD6_Pin GPIO_PIN_15
 #define LD6_GPIO_Port GPIOE
+#define AVOID_2_Trigger_Pin GPIO_PIN_10
+#define AVOID_2_Trigger_GPIO_Port GPIOD
+#define AVOID_2_Echo_Pin GPIO_PIN_11
+#define AVOID_2_Echo_GPIO_Port GPIOD
+#define PIR_MOVE_2_Pin GPIO_PIN_15
+#define PIR_MOVE_2_GPIO_Port GPIOD
+#define PIR_MOVE_2_EXTI_IRQn EXTI15_10_IRQn
+#define PIR_MOVE_1_Pin GPIO_PIN_9
+#define PIR_MOVE_1_GPIO_Port GPIOA
+#define PIR_MOVE_1_EXTI_IRQn EXTI9_5_IRQn
 #define DM_Pin GPIO_PIN_11
 #define DM_GPIO_Port GPIOA
 #define DP_Pin GPIO_PIN_12
@@ -107,6 +118,10 @@ void Error_Handler(void);
 #define SWCLK_GPIO_Port GPIOA
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
+#define AVOID_1_Echo_Pin GPIO_PIN_4
+#define AVOID_1_Echo_GPIO_Port GPIOB
+#define AVOID_1_Trigger_Pin GPIO_PIN_5
+#define AVOID_1_Trigger_GPIO_Port GPIOB
 #define I2C1_SCL_Pin GPIO_PIN_6
 #define I2C1_SCL_GPIO_Port GPIOB
 #define I2C1_SDA_Pin GPIO_PIN_7

@@ -1,19 +1,58 @@
-// #include <Arduino.h>
-// #include <SPI.h>
+#include <Arduino.h>
+#include <SPI.h>
 
-// #include "Handlers/RTOSHandler.h"
+#include "Handlers/RTOSHandler.h"
+#include "Handlers/ParserSerial2Handler.h"
 
-// void setup() {
-//   Serial.begin(115200);
+ParserSerial2Handler psh;
 
-//   init();
+String data;
 
-// }
+void setup() {
+   Serial.begin(115200);
+   Serial2.begin(38400);
 
-// void loop() {
+   
 
+   init();
 
-// }
+}
+
+void loop() {
+
+   // while (Serial.available())
+   // {
+   //    data = Serial.readStringUntil(':');
+
+   //    if (data.indexOf("1") >= 0)
+   //       Serial2.printf("LED#:1:YELLOW\r");
+
+   //    if (data.indexOf("2") >= 0)
+   //       Serial2.printf("AVOID#2:ASK_AVOIDANCE\r");
+
+   //    if (data.indexOf("3") >= 0)
+   //       Serial2.printf("PIR#2:ASK_LAST\r");
+   // }
+   
+
+   // while (Serial2.available())
+   // {
+   //    data = Serial2.readStringUntil('\r');
+   //    AvoidData ad;
+   //    PirData pd;
+   //    if (data.indexOf("AVOID") >= 0)
+   //       psh.parseAvoid(data, ad);
+      
+   //    else if (data.indexOf("PIR") >= 0)
+   //       psh.parsePir(data, pd);
+
+   //    else
+   //       psh.parseStatus(data);
+   //    // Serial.println(data);
+   // }
+   
+
+}
 
 
 
@@ -566,66 +605,93 @@
 // }
 
 
-#include <SPI.h>
-#include <MFRC522.h>
+// #include <Arduino.h>
 
-#define SS_PIN 5
-#define RST_PIN 15
-MFRC522 rfid(SS_PIN, RST_PIN); 
+// #include <SPI.h>
+// #include <MFRC522.h>
 
-void setup() {
- Serial.begin(115200);
- SPI.begin();        // Init SPI bus
- rfid.PCD_Init();   // Init MFRC522
-}
+// #define SS_PIN 5
+// #define RST_PIN 15
+// MFRC522 rfid(SS_PIN, RST_PIN); 
 
-void loop() {
- // Look for new cards
- if ( ! rfid.PICC_IsNewCardPresent())
-    return;
+// void setup() {
+   // Serial.begin(115200);
+   // Serial2.begin(38400);
+//  SPI.begin();        // Init SPI bus
+//  rfid.PCD_Init();   // Init MFRC522
+// }
 
- // Verify if the NUID has been readed
- if ( ! rfid.PICC_ReadCardSerial())
-    return;
+// void loop() {
 
-  MFRC522::MIFARE_Key key;
+   // String str = "";
 
- byte blockNumber = 16; // Change this to the block where you want to write the data
- byte keyA[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Default key
- byte keyB[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Default key
+   // while (Serial2.available())
+   // {
+      // str += Serial2.read();
+      // str.trim();
+      // Serial.println(str);
+      // Serial.println(str);
+   // }
+   
 
-  for (int i = 0; i < 6; i++) key.keyByte[i] = keyA[i];
+   // while (Serial.available()) {
+      // str = Serial.readString();
+      // if (str.indexOf("avoid1") >= 0)
+         // Serial2.printf("AVOID#1:ASK_AVOIDANCE\r");
+      // AVOID#1:ASK_AVOIDANCE
+      // Serial.println(str);
+      // str.trim();
+      // Serial2.printf("%s\r", str.c_str());
+   // }
 
- char asciiData[] = "9812762241";
- byte hexData[strlen(asciiData)]; // Each byte will be represented by two hexadecimal digits
- for(int i=0; i<strlen(asciiData); i++) {
-    // sprintf(&hexData[i], "%02x", asciiData[i]);
-    hexData[i] = static_cast<byte>(asciiData[i]);
- }
+   // while ()
+
+ // Look for new cards  
+//  if ( ! rfid.PICC_IsNewCardPresent())
+//     return;
+
+//  // Verify if the NUID has been readed
+//  if ( ! rfid.PICC_ReadCardSerial())
+//     return;
+
+//   MFRC522::MIFARE_Key key;
+
+//  byte blockNumber = 16; // Change this to the block where you want to write the data
+//  byte keyA[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Default key
+//  byte keyB[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}; // Default key
+
+//   for (int i = 0; i < 6; i++) key.keyByte[i] = keyA[i];
+
+//  char asciiData[] = "9812762241";
+//  byte hexData[strlen(asciiData)]; // Each byte will be represented by two hexadecimal digits
+//  for(int i=0; i<strlen(asciiData); i++) {
+//     // sprintf(&hexData[i], "%02x", asciiData[i]);
+//     hexData[i] = static_cast<byte>(asciiData[i]);
+//  }
 
 
- // Authenticate using key A
- MFRC522::StatusCode status = rfid.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNumber, &key, &(rfid.uid));
- if (status != MFRC522::STATUS_OK) {
-    Serial.println("Authentication failed!");
-    return;
- }
+//  // Authenticate using key A
+//  MFRC522::StatusCode status = rfid.PCD_Authenticate(MFRC522::PICC_CMD_MF_AUTH_KEY_A, blockNumber, &key, &(rfid.uid));
+//  if (status != MFRC522::STATUS_OK) {
+//     Serial.println("Authentication failed!");
+//     return;
+//  }
 
- // Write the HEX data to the block
- byte buffer[16] = {0};
+//  // Write the HEX data to the block
+//  byte buffer[16] = {0};
 
- for (int i = 0; i < strlen(asciiData); i++)
-  buffer[i] = hexData[i];
+//  for (int i = 0; i < strlen(asciiData); i++)
+//   buffer[i] = hexData[i];
  
-//  strncpy((char*)buffer, hexData, sizeof(buffer)-1);
- status = rfid.MIFARE_Write(blockNumber, buffer, 16);
- if (status != MFRC522::STATUS_OK) {
-    Serial.println("Write failed!");
-    return;
- }
+// //  strncpy((char*)buffer, hexData, sizeof(buffer)-1);
+//  status = rfid.MIFARE_Write(blockNumber, buffer, 16);
+//  if (status != MFRC522::STATUS_OK) {
+//     Serial.println("Write failed!");
+//     return;
+//  }
 
- Serial.println("Write successful");
-}
+//  Serial.println("Write successful");
+// }
 // void loop() {
 //   // Look for new cards
 //   if ( ! rfid.PICC_IsNewCardPresent())

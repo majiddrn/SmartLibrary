@@ -1,1 +1,2 @@
-../Core/Src/Callbacks.c:14:6:HAL_UART_RxCpltCallback	16	static
+../Core/Src/Callbacks.c:18:6:HAL_UART_RxCpltCallback	16	static
+../Core/Src/Callbacks.c:33:6:HAL_GPIO_EXTI_Callback	16	static

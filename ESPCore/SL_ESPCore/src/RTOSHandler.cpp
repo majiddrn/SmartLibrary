@@ -28,6 +28,18 @@ unsigned long lastSitChangePressed = 0; // Debouncing of OLED related button
 
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
+// SeatStatus lastStatus = SEAT_NOT_USE;
+//     bool change = false;
+//     Seat change_to;
+//     uint8_t sitNumberChanged;
+
+typedef struct State {
+    SeatStatus lastStatus;
+    bool change;
+    Seat change_to;
+    uint8_t sitNumberChanged;
+};
+
 ////////////////////////////// Prioriorities \\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
 #define OLED_HANDLER_PRIORITY 2
@@ -49,6 +61,12 @@ StaticSemaphore_t xSemaphoreBuffer;
 //////////////////////////// Semaphore Queues \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
 //////////////////////////////// Handlers \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
+
+void stateHandler(State states[], uint8_t n) {
+    for (uint8_t i = 0; i < n; i++) {
+        
+    }
+}
 
 //////////////////////////////// Handlers \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
@@ -240,6 +258,17 @@ void seatIndividualPresenceTask_(void* parameter) {
 
     bool presence[seatNumber];
     bool moving[seatNumber];
+    bool first = true;
+
+    // SeatStatus lastStatus = SEAT_NOT_USE;
+    // bool change = false;
+    // Seat change_to;
+    // uint8_t sitNumberChanged;
+    State state[seatNumber];
+    state[0].change = false;
+    state[1].change = false;
+    
+    // unsigned long last
 
     while (true)
     {
@@ -253,7 +282,7 @@ void seatIndividualPresenceTask_(void* parameter) {
         xSemaphoreGive(seatsSemaphore);
             
         cnt++;
-        if (cnt >= 5) {
+        if (cnt >= 50) {
             xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
             for (uint8_t i = 1; i <= seatNumber; i++){
                 
@@ -261,7 +290,7 @@ void seatIndividualPresenceTask_(void* parameter) {
                 
             }
             xSemaphoreGive(seatsSemaphore);
-            
+            first = false;
             cnt = 0;
         }
 
@@ -270,7 +299,11 @@ void seatIndividualPresenceTask_(void* parameter) {
         
         for (uint8_t i = 1; i <= seatNumber; i++) {
             uint8_t idx = i-1;
-            
+
+            xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+            Seat currentSeat = tableHandler.seats[idx];
+            xSemaphoreGive(seatsSemaphore);
+
             Serial.println("idx: " + (String)idx);
 
             xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
@@ -281,32 +314,84 @@ void seatIndividualPresenceTask_(void* parameter) {
             if (inuse) {
 
                 if (!presence[idx]) {
+                    xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+                    tableHandler.seats[idx].status = SEAT_IN_USE_REST;
+                    xSemaphoreGive(seatsSemaphore);
+
                     ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
+                    if (state[idx].lastStatus != SEAT_IN_USE_REST) {
+                        state[idx].change_to = currentSeat;
+
+                        state[idx].change_to.status = SEAT_IN_USE_REST;
+
+                        state[idx].lastStatus = SEAT_IN_USE_REST;
+                        state[idx].sitNumberChanged = i;
+                    } else 
+                        state[idx].change = false;
         //             /*
                 
         //             do server things
                 
         //             */
                 } else {
-        //             // if (!moving[idx]) {
-        //             //     ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
-        //             //     /*
+                    if (!moving[idx] && !first) {
+                        xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+                        tableHandler.seats[idx].status = SEAT_IN_USE_REST;
+                        xSemaphoreGive(seatsSemaphore);
+                        
+                        ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
+                        if (state[idx].lastStatus != SEAT_IN_USE_REST) {
+                            state[idx].change_to = currentSeat;
+
+                            state[idx].change_to.status = SEAT_IN_USE_REST;
+
+                            state[idx].lastStatus = SEAT_IN_USE_REST;
+                            state[idx].sitNumberChanged = i;
+                        } else 
+                            state[idx].change = false;
+                        /*
                 
-        //             //     do server things
+                        do server things
                 
-        //             //     */
-        //             // } else {
+                        */
+                    } else {
+                        xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+                        tableHandler.seats[idx].status = SEAT_IN_USE;
+                        xSemaphoreGive(seatsSemaphore);
+
                         ParserSerial2Handler::setLED(i, LED_COLOR_RED);
+                        if (state[idx].lastStatus != SEAT_IN_USE) {
+                            state[idx].change_to = currentSeat;
+
+                            state[idx].change_to.status = SEAT_IN_USE;
+
+                            state[idx].lastStatus = SEAT_IN_USE;
+                            state[idx].sitNumberChanged = i;
+                        } else 
+                            state[idx].change = false;
         //                 /*
                 
         //                 do server things
                 
         //                 */
-        //             // }
+                    }
                 }
 
             } else {
+                xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+                tableHandler.seats[idx].status = SEAT_NOT_USE;
+                xSemaphoreGive(seatsSemaphore);
+
                 ParserSerial2Handler::setLED(i, LED_COLOR_GREEN);
+                if (state[idx].lastStatus != SEAT_NOT_USE) {
+                    state[idx].change_to = currentSeat;
+
+                    state[idx].change_to.status = SEAT_NOT_USE;
+
+                    state[idx].lastStatus = SEAT_NOT_USE;
+                    state[idx].sitNumberChanged = i;
+                } else 
+                    state[idx].change = false;
         //         /*
                 
         //         do server things

@@ -6,6 +6,7 @@ extern TIM_HandleTypeDef htim8;
 
 extern osMutexId_t pirTime1Handle;
 extern osMutexId_t pirTime2Handle;
+extern osMutexId_t uartTransmitHandle;
 
 extern uint32_t pirTime[2];
 
@@ -29,7 +30,10 @@ int doPIRFunc(Message pirMessage) {
 	}
 
 	sprintf(tmp, "PIR#%d:%d\r", pirMessage.mNumber, pirTime[pirMessage.mNumber-1]);
+
+	osMutexAcquire(uartTransmitHandle, portMAX_DELAY);
 	HAL_UART_Transmit(&huart2, tmp, strlen(tmp), 250);
+	osMutexRelease(uartTransmitHandle);
 
 	switch (pirMessage.mNumber) {
 		case 1:

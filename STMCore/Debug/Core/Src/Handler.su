@@ -1,7 +1,7 @@
-../Core/Src/Handler.c:5:13:getMessageType	16	static
-../Core/Src/Handler.c:18:5:parseLedMessage	24	static
-../Core/Src/Handler.c:42:5:parsePirMessage	24	static
-../Core/Src/Handler.c:67:5:parseAvoidMessage	24	static
-../Core/Src/Handler.c:92:5:parseMessage	24	static
-../Core/Src/Handler.c:132:6:addToHandler	56	static
-../Core/Src/Handler.c:168:6:sendACK	48	static
+../Core/Src/Handler.c:8:13:getMessageType	16	static
+../Core/Src/Handler.c:21:5:parseLedMessage	24	static
+../Core/Src/Handler.c:45:5:parsePirMessage	24	static
+../Core/Src/Handler.c:70:5:parseAvoidMessage	24	static
+../Core/Src/Handler.c:95:5:parseMessage	24	static
+../Core/Src/Handler.c:135:6:addToHandler	56	static
+../Core/Src/Handler.c:171:6:sendACK	48	static

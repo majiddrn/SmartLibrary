@@ -1,6 +1,7 @@
 #include "AvoidHandler.h"
 
 extern UART_HandleTypeDef huart2;
+extern osMutexId_t uartTransmitHandle;
 
 int doAVOIDFunc(Message avoidMessage) {
 	if (avoidMessage.mNumber > maxSeats)
@@ -20,7 +21,10 @@ int doAVOIDFunc(Message avoidMessage) {
 	}
 
 	sprintf(tmp, "AVOID#%d:%d\r", avoidMessage.mNumber, rawAVOID[avoidMessage.mNumber-1]);
+
+	osMutexAcquire(uartTransmitHandle, portMAX_DELAY);
 	HAL_UART_Transmit(&huart2, tmp, strlen(tmp), 250);
+	osMutexRelease(uartTransmitHandle);
 
 	switch (avoidMessage.mNumber) {
 		case 1:
@@ -68,10 +72,10 @@ uint32_t getAvoidDistance(uint8_t avoidNum) {
 	while(timer_->CNT <= timeNeeded);
 	HAL_GPIO_WritePin(gpioType, pinNumTrig, 0);
 
-	while (HAL_GPIO_ReadPin(gpioType, pinNumEcho) == 0);
+	while (HAL_GPIO_ReadPin(gpioType, pinNumEcho) == 0 && timer_->CNT <= 20000);
 
 	timer_->CNT = 0;
-	while(HAL_GPIO_ReadPin(gpioType, pinNumEcho) == 1);
+	while(HAL_GPIO_ReadPin(gpioType, pinNumEcho) == 1 && timer_->CNT <= 10000);
 
 	uint32_t tof = timer_->CNT;
 	uint32_t distance = tof / 58;

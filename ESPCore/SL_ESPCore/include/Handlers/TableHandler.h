@@ -1,7 +1,9 @@
-#ifndef TABLEHANDELR_H
+#ifndef TABLEHANDLER_H
 #define TABLEHANDLER_H
 
 #include <Arduino.h>
+#include "SensorsModulesCommon.h"
+#include "Handlers/ParserSerial2Handler.h"
 
 typedef enum SeatStatus {
     SEAT_IN_USE_REST,
@@ -12,18 +14,27 @@ typedef enum SeatStatus {
 typedef struct Seat {
     String studentNum;
     SeatStatus status;
-    uint8_t number;
 };
 
 class TableHandler
 {
 private:
-    
+    uint16_t seatDistanceThr {40};
+    uint16_t lastPIRSeatTime {0};
+    uint8_t seatNumbers = 2;
+    SeatStatus distance2SeatStatus(AvoidData distance);
 public:
     TableHandler(/* args */);
     ~TableHandler();
     bool sitOn(uint8_t, String);
+    bool emptySeat(uint8_t);
+    bool getSeatPresence(uint8_t seatNum);
+    bool isMovedSinceLast(uint8_t seaNum);              // will only be called when 
+    bool sitInUse(uint8_t seatNum);
     Seat seats[2];
+    uint8_t getSeatNumbers() {
+        return seatNumbers;
+    }
 };
 
 

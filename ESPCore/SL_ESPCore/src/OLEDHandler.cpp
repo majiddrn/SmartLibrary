@@ -77,6 +77,7 @@ uint8_t OLEDHandler::increaseNumber() {
 
     // vTaskDelay(100);
     drawScreen(number + 1, true);
+    Serial.println("NUMBER INCREASED -> " + (String)number);
     // display.setCursor(54, 40);
     // display.print(String(number));
     // display.drawString(50, 40, String(number));
@@ -89,10 +90,11 @@ uint8_t OLEDHandler::increaseNumber() {
 }
 
 uint8_t OLEDHandler::getNumber() {
-    return number;
+    Serial.println("GOT NUMBER " + (String) number);
+    return number + 1;
 }
 
-void OLEDHandler::drawString(String str) {
+void OLEDHandler::drawString(String str, uint8_t number) {
     display.clear();
 
     display.setFont(ArialMT_Plain_16);

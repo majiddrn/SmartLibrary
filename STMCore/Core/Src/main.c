@@ -109,6 +109,11 @@ osMutexId_t pirTime2Handle;
 const osMutexAttr_t pirTime2_attributes = {
   .name = "pirTime2"
 };
+/* Definitions for uartTransmit */
+osMutexId_t uartTransmitHandle;
+const osMutexAttr_t uartTransmit_attributes = {
+  .name = "uartTransmit"
+};
 /* Definitions for diffRxData */
 osSemaphoreId_t diffRxDataHandle;
 const osSemaphoreAttr_t diffRxData_attributes = {
@@ -180,9 +185,28 @@ int compare(const void* a, const void* b) {
     return A - B;
 }
 
+
+void selectionSort(int arr[], int n) {
+    int i, j, minIndex, tmp;
+
+    // One by one move boundary of unsorted subarray
+    for (i = 0; i < n - 1; i++) {
+        // Find the minimum element in unsorted array
+        minIndex = i;
+        for (j = i + 1; j < n; j++)
+            if (arr[j] < arr[minIndex])
+                minIndex = j;
+
+        // Swap the found minimum element with the first element of the unsorted array
+        tmp = arr[minIndex];
+        arr[minIndex] = arr[i];
+        arr[i] = tmp;
+    }
+}
+
 double getMedian(int arr[], int n) {
     // Sorting the array
-    qsort(arr, n, sizeof(int), compare);
+	selectionSort(arr, n);
 
     // If size of the array is even
     if (n % 2 != 0)
@@ -281,6 +305,9 @@ int main(void)
 
   /* creation of pirTime2 */
   pirTime2Handle = osMutexNew(&pirTime2_attributes);
+
+  /* creation of uartTransmit */
+  uartTransmitHandle = osMutexNew(&uartTransmit_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -1018,18 +1045,26 @@ void AvoidPIRHandler_f(void *argument)
 	  rawAVOIDWindow[1][rawAVOIDWindow_idx] = getAvoidDistance(2);
 
 	  rawAVOIDWindow_idx++;
-
-	  if (rawAVOIDWindow_idx == 10) {
+//
+//	  osMutexAcquire(AvoidDistance1Handle, portMAX_DELAY);
+//	  rawAVOID[0] = getAvoidDistance(1);
+//	  osMutexRelease(AvoidDistance1Handle);
+////
+//	  osMutexAcquire(AvoidDistance2Handle, portMAX_DELAY);
+//	  rawAVOID[1] = getAvoidDistance(2);
+//	  osMutexRelease(AvoidDistance2Handle);
+	  if (rawAVOIDWindow_idx == 5) {
 		  osMutexAcquire(AvoidDistance1Handle, portMAX_DELAY);
-		  rawAVOID[0] = getMedian(rawAVOIDWindow[0], 10);
+		  rawAVOID[0] = getMedian(rawAVOIDWindow[0], 5);
 		  osMutexRelease(AvoidDistance1Handle);
+
 		  osMutexAcquire(AvoidDistance2Handle, portMAX_DELAY);
-		  rawAVOID[1] = getMedian(rawAVOIDWindow[1], 10);
+		  rawAVOID[1] = getMedian(rawAVOIDWindow[1], 5);
 		  osMutexRelease(AvoidDistance2Handle);
 
 		  rawAVOIDWindow_idx = 0;
-//		  uint8_t s = sprintf(tmp, "1: %d, 2: %d\n", rawAVOID[0], rawAVOID[1]);
-//		  HAL_UART_Transmit(&huart2, tmp, s, 250);
+////		  uint8_t s = sprintf(tmp, "1: %d, 2: %d\n", rawAVOID[0], rawAVOID[1]);
+////		  HAL_UART_Transmit(&huart2, tmp, s, 250);
 	  }
 
 //	  if

@@ -15,8 +15,10 @@
 OLEDHandler oledHandlerObj(false);
 WiFiHandler wifiHandlerObj;
 
+TableHandler tableHandler;
+
 #define LAST_CHANGE_BUTTON_DEBOUNCE 250
-unsigned long lastSitChangePressed = 0;
+unsigned long lastSitChangePressed = 0; // Debouncing of OLED related button
 
 #include <SPI.h>
 #include <MFRC522.h>
@@ -31,6 +33,7 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 #define OLED_HANDLER_PRIORITY 2
 #define RFID_HANDLER_PRIORITY 2
 #define SEAT_SITTING_HANDLER_PRIORITY 2
+#define SEAT_INDIVIDUALT_PRESENCE_HANDLER 3
 
 ////////////////////////////// Prioriorities \\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
@@ -38,7 +41,10 @@ MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 QueueHandle_t oledQueue = NULL;
 QueueHandle_t seatSittingQueue = NULL;
+
 SemaphoreHandle_t differLastChangeSemaphore = NULL;
+SemaphoreHandle_t seatsSemaphore = NULL;
+StaticSemaphore_t xSemaphoreBuffer;
 
 //////////////////////////// Semaphore Queues \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
@@ -51,6 +57,7 @@ SemaphoreHandle_t differLastChangeSemaphore = NULL;
 TaskHandle_t oledHandlerTask = NULL;
 TaskHandle_t rfidHandlerTask = NULL;
 TaskHandle_t seatSittingHandlerTask = NULL;
+TaskHandle_t seatIndividualPresenceTask = NULL;
 
 ////////////////////////////// RTOS Handlers \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
@@ -84,15 +91,48 @@ void seatSittingHandlerTask_(void* parameter) {
 
         Student student = Students::isStudentValid(seat.studentNum);
 
+        uint8_t number = oledHandlerObj.getNumber();
+
+        Serial.println("Number : " + (String) number);
+
         if (student.fname.indexOf("0") == 0) {
-            oledHandlerObj.drawString("Student Not found");
+            oledHandlerObj.drawString("Student Not found", number);
             vTaskDelay(50 / portTICK_PERIOD_MS);
             continue;
         }
 
         String msg = student.fname + " " + student.lname;
-        oledHandlerObj.drawString(msg);
-        // Serial.printf("%s found\n", student.snum);
+        oledHandlerObj.drawString(msg, number);
+
+        Serial.println("After drawing");
+
+
+        Serial.println("NUMBER: " + (String)number);
+
+        xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+
+        bool inUse = tableHandler.sitInUse(number);
+        
+        xSemaphoreGive(seatsSemaphore);
+
+        Serial.println("sit " + (String)number + " " + (String)inUse);
+
+        if (!inUse) {    // sitting
+            xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+            tableHandler.sitOn(number, student.snum);
+            xSemaphoreGive(seatsSemaphore);
+            Serial.println("Sitting");
+        }
+
+        else {                                
+            if (tableHandler.seats[number-1].studentNum.indexOf(student.snum) >= 0) { // leaving
+            xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+            tableHandler.emptySeat(number);
+            xSemaphoreGive(seatsSemaphore);
+            }
+        }
+        
+        // xSemaphoreGive(seatsSemaphore);
         
         vTaskDelay(50 / portTICK_PERIOD_MS);
     }
@@ -100,7 +140,7 @@ void seatSittingHandlerTask_(void* parameter) {
 }
 
 void oledHandlerTask_(void * parameter) {
-    oledHandlerObj.setNumber(1);
+    // oledHandlerObj.setNumber(1);
     
     while (true)
     {
@@ -178,7 +218,7 @@ void rfidHandlerTask_(void* parameter) {
 
         Serial.println(asciiBuffer);
 
-        Seat seat {asciiBuffer, SEAT_IN_USE_REST, 1};
+        Seat seat {asciiBuffer, SEAT_IN_USE_REST};
 
         xQueueSend(seatSittingQueue, &seat, portMAX_DELAY);
 
@@ -193,13 +233,107 @@ void rfidHandlerTask_(void* parameter) {
     
 }
 
+void seatIndividualPresenceTask_(void* parameter) {
+    static uint8_t cnt = 0;
+
+    uint8_t seatNumber = tableHandler.getSeatNumbers();
+
+    bool presence[seatNumber];
+    bool moving[seatNumber];
+
+    while (true)
+    {
+        Serial.println("PROCESS");
+        xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+        for (uint8_t i = 1; i <= seatNumber; i++) {
+            
+            presence[i-1] = tableHandler.getSeatPresence(i);
+            
+        }
+        xSemaphoreGive(seatsSemaphore);
+            
+        cnt++;
+        if (cnt >= 5) {
+            xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+            for (uint8_t i = 1; i <= seatNumber; i++){
+                
+                moving[i-1] = tableHandler.isMovedSinceLast(i);
+                
+            }
+            xSemaphoreGive(seatsSemaphore);
+            
+            cnt = 0;
+        }
+
+        // Serial.println("Presence2: " + (String)tableHandler.getSeatPresence(2) + ", in use:" + (String)tableHandler.sitInUse(2) + " Move 2: " + (String)tableHandler.isMovedSinceLast(2));
+
+        
+        for (uint8_t i = 1; i <= seatNumber; i++) {
+            uint8_t idx = i-1;
+            
+            Serial.println("idx: " + (String)idx);
+
+            xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+            bool inuse = tableHandler.sitInUse(i);
+            Serial.printf("Seat %d : %d\n", i, (int)inuse);
+            xSemaphoreGive(seatsSemaphore);
+
+            if (inuse) {
+
+                if (!presence[idx]) {
+                    ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
+        //             /*
+                
+        //             do server things
+                
+        //             */
+                } else {
+        //             // if (!moving[idx]) {
+        //             //     ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
+        //             //     /*
+                
+        //             //     do server things
+                
+        //             //     */
+        //             // } else {
+                        ParserSerial2Handler::setLED(i, LED_COLOR_RED);
+        //                 /*
+                
+        //                 do server things
+                
+        //                 */
+        //             // }
+                }
+
+            } else {
+                ParserSerial2Handler::setLED(i, LED_COLOR_GREEN);
+        //         /*
+                
+        //         do server things
+                
+        //         */
+
+            }
+        }
+        // xSemaphoreGive(seatsSemaphore);
+
+        vTaskDelay(1500 / portTICK_PERIOD_MS);    
+    }
+    
+}
+
 ////////////////////////////// Task Functions \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
 void initQueueSemaphores() {
     oledQueue = xQueueCreate(1, sizeof(OLEDMessage));
     seatSittingQueue = xQueueCreate(1, sizeof(Seat));
+
+    seatsSemaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(seatsSemaphore);
+
     differLastChangeSemaphore = xSemaphoreCreateBinary();
     xSemaphoreTake(differLastChangeSemaphore, 250);
+    
 }
 
 void initWiFi() {
@@ -216,6 +350,7 @@ void initTasks() {
     xTaskCreatePinnedToCore(oledHandlerTask_, "oledHandlerTask", 10 * KB, NULL, OLED_HANDLER_PRIORITY, &oledHandlerTask, DEFAULT_CORE);
     xTaskCreatePinnedToCore(rfidHandlerTask_, "rfidHandlerTask", 50 * KB, NULL, RFID_HANDLER_PRIORITY, &rfidHandlerTask, DEFAULT_CORE);
     xTaskCreatePinnedToCore(seatSittingHandlerTask_, "seatSittingHandlerTask", 20 * KB, NULL, SEAT_SITTING_HANDLER_PRIORITY, &seatSittingHandlerTask, DEFAULT_CORE);
+    xTaskCreatePinnedToCore(seatIndividualPresenceTask_, "seatInduvidualPresenceTask", 20 * KB, NULL, SEAT_INDIVIDUALT_PRESENCE_HANDLER, &seatIndividualPresenceTask, DEFAULT_CORE);
 }
 
 void sampleStudents() {

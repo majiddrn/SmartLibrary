@@ -28,7 +28,7 @@ public:
     void beginOLEDSeat();
     void setNumber(uint8_t num);
     void drawScreen(uint8_t num, bool clear = false);
-    void drawString(String);
+    void drawString(String, uint8_t number);
     uint8_t increaseNumber();
     uint8_t getNumber();
 };

@@ -1,6 +1,9 @@
 #include "Handler.h"
+#include "cmsis_os.h"
 
 extern UART_HandleTypeDef huart2;
+
+extern osMutexId_t uartTransmitHandle;
 
 MessageType getMessageType(const char* message) {
     if (strncmp(message, "LED#", 4) == 0)
@@ -173,18 +176,27 @@ void sendACK(enum ACK_TYPE ack) {
 	switch (ack) {
 		case ACK_INVALID:
 			len = sprintf(tmp, "INVALID\r");
+
+			osMutexAcquire(uartTransmitHandle, portMAX_DELAY);
 			status = HAL_UART_Transmit(&huart2, tmp, len, 250);
+			osMutexRelease(uartTransmitHandle);
 //			else
 //				HAL_GPIO_WritePin(GPIOE, GPIO_PIN_9, 1);
 			break;
 		case ACK_OK:
 			len = sprintf(tmp, "OK\r");
+
+			osMutexAcquire(uartTransmitHandle, portMAX_DELAY);
 			status = HAL_UART_Transmit(&huart2, tmp, len, 250);
+			osMutexRelease(uartTransmitHandle);
 
 			break;
 		case ACK_ERR:
 			len = sprintf(tmp, "ERROR\r");
+
+			osMutexAcquire(uartTransmitHandle, portMAX_DELAY);
 			status = HAL_UART_Transmit(&huart2, tmp, len, 250);
+			osMutexRelease(uartTransmitHandle);
 
 			break;
 		default:

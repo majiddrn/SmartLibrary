@@ -1,2 +1,2 @@
-../Core/Src/AvoidHandler.c:5:5:doAVOIDFunc	32	static
-../Core/Src/AvoidHandler.c:39:10:getAvoidDistance	40	static
+../Core/Src/AvoidHandler.c:6:5:doAVOIDFunc	32	static
+../Core/Src/AvoidHandler.c:43:10:getAvoidDistance	40	static

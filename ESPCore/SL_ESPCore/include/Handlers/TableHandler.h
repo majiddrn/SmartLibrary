@@ -20,7 +20,7 @@ class TableHandler
 {
 private:
     uint16_t seatDistanceThr {40};
-    uint16_t lastPIRSeatTime {0};
+    uint16_t lastPIRSeatTime[2];
     uint8_t seatNumbers = 2;
     SeatStatus distance2SeatStatus(AvoidData distance);
 public:

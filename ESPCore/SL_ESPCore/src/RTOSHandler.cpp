@@ -267,7 +267,7 @@ void seatIndividualPresenceTask_(void* parameter) {
     State state[seatNumber];
     state[0].change = false;
     state[1].change = false;
-    
+
     // unsigned long last
 
     while (true)
@@ -354,7 +354,7 @@ void seatIndividualPresenceTask_(void* parameter) {
                         do server things
                 
                         */
-                    } else {
+                    } else if (moving[idx]) {
                         xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
                         tableHandler.seats[idx].status = SEAT_IN_USE;
                         xSemaphoreGive(seatsSemaphore);

@@ -73,9 +73,15 @@ bool TableHandler::isMovedSinceLast(uint8_t seatNum) {
         return seats[seatNum-1].status;
     }
 
-    if (lastTrigger.lastTrigTime != lastPIRSeatTime)
+    Serial.printf("last: %d, lastPIRSeatTime: %d\n", lastTrigger.lastTrigTime, lastPIRSeatTime[seatNum-1]);
+
+    if (lastTrigger.lastTrigTime != lastPIRSeatTime[seatNum-1]) {
+        lastPIRSeatTime[seatNum-1] = lastTrigger.lastTrigTime;
         return true;
+    }
     
+    lastPIRSeatTime[seatNum-1] = lastTrigger.lastTrigTime;
+
     return false;
 }
 

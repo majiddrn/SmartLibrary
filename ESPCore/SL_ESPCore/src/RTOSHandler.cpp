@@ -40,6 +40,8 @@ typedef struct State {
     uint8_t sitNumberChanged;
 };
 
+#define REST_TIME_OVERLOAD_THRESHOLD 300000
+
 ////////////////////////////// Prioriorities \\\\\\\\\\\\\\\\\\\\\\\\\\\\\/
 
 #define OLED_HANDLER_PRIORITY 2
@@ -257,6 +259,10 @@ void seatIndividualPresenceTask_(void* parameter) {
     uint8_t seatNumber = tableHandler.getSeatNumbers();
 
     bool presence[seatNumber];
+
+    bool timeOverloaded[seatNumber];
+    unsigned long firstRestTime = 0;
+
     bool moving[seatNumber];
     bool first = true;
 
@@ -310,6 +316,8 @@ void seatIndividualPresenceTask_(void* parameter) {
             bool inuse = tableHandler.sitInUse(i);
             Serial.printf("Seat %d : %d\n", i, (int)inuse);
             xSemaphoreGive(seatsSemaphore);
+            
+            check_again:
 
             if (inuse) {
 
@@ -320,14 +328,30 @@ void seatIndividualPresenceTask_(void* parameter) {
 
                     ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
                     if (state[idx].lastStatus != SEAT_IN_USE_REST) {
+                        firstRestTime = millis();
+
                         state[idx].change_to = currentSeat;
 
                         state[idx].change_to.status = SEAT_IN_USE_REST;
 
                         state[idx].lastStatus = SEAT_IN_USE_REST;
                         state[idx].sitNumberChanged = i;
-                    } else 
-                        state[idx].change = false;
+                    } else {
+                        
+                        if (millis() - firstRestTime >= REST_TIME_OVERLOAD_THRESHOLD) {
+                            state[idx].change = true;
+                            state[idx].change_to = currentSeat;
+                            currentSeat.status = SEAT_NOT_USE;
+                            state[idx].lastStatus = SEAT_NOT_USE;
+                            state[idx].sitNumberChanged = i;
+
+                            xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+                            tableHandler.seats[idx].status = SEAT_NOT_USE;
+                            tableHandler.seats[idx].studentNum = "0";
+                            xSemaphoreGive(seatsSemaphore);
+                        } else 
+                            state[idx].change = false;
+                    }
         //             /*
                 
         //             do server things
@@ -341,14 +365,28 @@ void seatIndividualPresenceTask_(void* parameter) {
                         
                         ParserSerial2Handler::setLED(i, LED_COLOR_YELLOW);
                         if (state[idx].lastStatus != SEAT_IN_USE_REST) {
-                            state[idx].change_to = currentSeat;
+                            firstRestTime = millis();
 
+                            state[idx].change_to = currentSeat;
                             state[idx].change_to.status = SEAT_IN_USE_REST;
 
                             state[idx].lastStatus = SEAT_IN_USE_REST;
                             state[idx].sitNumberChanged = i;
-                        } else 
-                            state[idx].change = false;
+                        } else {
+                            if (millis() - firstRestTime >= REST_TIME_OVERLOAD_THRESHOLD) {
+                                state[idx].change = true;
+                                state[idx].change_to = currentSeat;
+                                currentSeat.status = SEAT_NOT_USE;
+                                state[idx].lastStatus = SEAT_NOT_USE;
+                                state[idx].sitNumberChanged = i;
+
+                                xSemaphoreTake(seatsSemaphore, portMAX_DELAY);
+                                tableHandler.seats[idx].status = SEAT_NOT_USE;
+                                tableHandler.seats[idx].studentNum = "0";
+                                xSemaphoreGive(seatsSemaphore);
+                            } else 
+                                state[idx].change = false;
+                        }
                         /*
                 
                         do server things
@@ -361,6 +399,7 @@ void seatIndividualPresenceTask_(void* parameter) {
 
                         ParserSerial2Handler::setLED(i, LED_COLOR_RED);
                         if (state[idx].lastStatus != SEAT_IN_USE) {
+                            
                             state[idx].change_to = currentSeat;
 
                             state[idx].change_to.status = SEAT_IN_USE;

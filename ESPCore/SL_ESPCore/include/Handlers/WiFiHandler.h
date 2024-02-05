@@ -7,12 +7,15 @@
 class WiFiHandler
 {
 private:
-    WiFiClient client;
+    String localServerIp = "192.168.43.244";
+    uint16_t localServerPort = 9898;
+    bool firstInit = true;
 public:
     WiFiHandler();
     ~WiFiHandler();
     void begin(String ssid, String password);
     void connectTCP();
+    WiFiClient client;
 };
 
 

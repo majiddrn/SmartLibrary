@@ -27,7 +27,7 @@ bool TableHandler::sitOn(uint8_t num, String sNum) {
 
 bool TableHandler::emptySeat(uint8_t num) {
     seats[num-1].status = SEAT_NOT_USE;
-    seats[num-1].studentNum = "0";
+    // seats[num-1].studentNum = "0";
 
     return true;
 }
@@ -66,21 +66,21 @@ bool TableHandler::getSeatPresence(uint8_t seatNum) {
 }
 
 bool TableHandler::isMovedSinceLast(uint8_t seatNum) {
-    PirData lastTrigger = ParserSerial2Handler::getLastTrigger(seatNum);
+    PirData trigger = ParserSerial2Handler::getLastTrigger(seatNum);
 
     if (seatNum == 0) {
         Serial.println("Failed in getting last trigger");
         return seats[seatNum-1].status;
     }
 
-    Serial.printf("last: %d, lastPIRSeatTime: %d\n", lastTrigger.lastTrigTime, lastPIRSeatTime[seatNum-1]);
+    Serial.printf("last: %d, lastPIRSeatTime: %d\n", trigger.lastTrigTime, lastPIRSeatTime[seatNum-1]);
 
-    if (lastTrigger.lastTrigTime != lastPIRSeatTime[seatNum-1]) {
-        lastPIRSeatTime[seatNum-1] = lastTrigger.lastTrigTime;
+    if (trigger.lastTrigTime != lastPIRSeatTime[seatNum-1]) {
+        lastPIRSeatTime[seatNum-1] = trigger.lastTrigTime;
         return true;
     }
     
-    lastPIRSeatTime[seatNum-1] = lastTrigger.lastTrigTime;
+    lastPIRSeatTime[seatNum-1] = trigger.lastTrigTime;
 
     return false;
 }

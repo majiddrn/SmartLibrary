@@ -140,7 +140,7 @@ PirData ParserSerial2Handler::getLastTrigger(uint8_t seatNum) {
     if (response.indexOf("PIR") < 0)
         return {0, 0};
     
-    Serial.println("Failed\n");
+    // Serial.println("Failed\n");
 
     PirData lastTriger = parsePir(response);
 
